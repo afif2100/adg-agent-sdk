@@ -46,6 +46,7 @@ class TestScaffolder:
         assert "README.md" in files
         assert ".gitignore" in files
         assert ".env.example" in files
+        assert "agents.md" in files
         assert ".adg-sdk" in files
         assert "src/test_project/__init__.py" in files
         assert "src/test_project/__main__.py" in files
