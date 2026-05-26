@@ -44,9 +44,11 @@ class TestCliInit:
             result = runner.invoke(app, ["init", "my-app", "--dir", str(target)])
             assert result.exit_code == 0, f"Exit code {result.exit_code}: {result.stdout}"
             assert target.exists()
-            assert (target / "pyproject.toml").exists()
+            # Default is minimal — no backend, just root files
+            assert not (target / "pyproject.toml").exists()
             assert (target / "AGENTS.md").exists()
             assert (target / ".adg-sdk").exists()
+            assert (target / ".claude" / "rules" / ".gitkeep").exists()
             marker = json.loads((target / ".adg-sdk").read_text())
             assert marker["project_name"] == "my-app"
 
@@ -69,10 +71,10 @@ class TestCliInit:
             target = Path(tmp) / "minimal"
             result = runner.invoke(
                 app,
-                ["init", "minimal", "--dir", str(target), "--no-example-code", "--no-git"],
+                ["init", "minimal", "--dir", str(target), "--no-git", "--stack", "be", "--no-example-code"],
             )
             assert result.exit_code == 0, result.stdout
-            # Core files still present
+            # Core files present
             assert (target / "pyproject.toml").exists()
             # No example code
             assert not (target / "src/minimal/agents").exists()
@@ -136,7 +138,8 @@ class TestCliInit:
             assert result.exit_code == 0, result.stdout
             # Old file should be gone, new files present
             assert not (target / "old-file.txt").exists()
-            assert (target / "pyproject.toml").exists()
+            assert (target / "AGENTS.md").exists()
+            assert (target / ".adg-sdk").exists()
 
 
 class TestCliStart:

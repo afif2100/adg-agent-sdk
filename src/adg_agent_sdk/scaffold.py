@@ -15,6 +15,7 @@ from . import __version__
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
 STACK_CHOICES = ("be", "fe", "fe+be")
+DEFAULT_STACK = ""
 
 
 def _confirm_overwrite(path: Path) -> bool:
@@ -46,7 +47,7 @@ class Scaffolder:
         project_name: str,
         package_name: str,
         output_dir: Path,
-        stack: str = "be",
+        stack: str = DEFAULT_STACK,
         include_example_code: bool = True,
         include_docker: bool = False,
         include_ci: bool = False,
@@ -58,7 +59,7 @@ class Scaffolder:
         self.project_name = project_name
         self.package_name = package_name
         self.output_dir = output_dir.resolve()
-        self.stack = stack if stack in STACK_CHOICES else "be"
+        self.stack = stack if stack in STACK_CHOICES else DEFAULT_STACK
         self.include_example_code = include_example_code
         self.include_docker = include_docker
         self.include_ci = include_ci
@@ -156,7 +157,7 @@ class Scaffolder:
     def run(self) -> None:
         """Execute the full scaffold."""
         # ── preamble ─────────────────────────────────────────────
-        stack_label = {"be": "Backend", "fe": "Frontend", "fe+be": "Fullstack (FE + BE)"}[self.stack]
+        stack_label = {"": "Minimal", "be": "Backend", "fe": "Frontend", "fe+be": "Fullstack (FE + BE)"}.get(self.stack, "Minimal")
         typer.echo(
             f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             f"\n ADG SDK › Creating project: {self.project_name}"
@@ -219,6 +220,20 @@ class Scaffolder:
             )
             typer.echo("  📄  .adg-sdk")
 
+        # ── .claude directory ───────────────────────────────────
+        claude_dirs = [
+            self.output_dir / ".claude" / "rules",
+            self.output_dir / ".claude" / "skills",
+        ]
+        for d in claude_dirs:
+            if self.dry_run:
+                typer.echo(f"  📄  {d.relative_to(self.output_dir)}/")
+            else:
+                d.mkdir(parents=True, exist_ok=True)
+                gitkeep = d / ".gitkeep"
+                gitkeep.write_text("")
+                typer.echo(f"  📄  {gitkeep.relative_to(self.output_dir)}")
+
         # ── summary ─────────────────────────────────────────────
         if self.dry_run:
             typer.echo("\n  ✓ Dry-run complete.")
@@ -228,7 +243,7 @@ class Scaffolder:
         typer.echo(f"\n  ✓ Project scaffolded at: {label}")
 
         # ── post-gen hooks ──────────────────────────────────────
-        if self.stack != "fe":
+        if self.stack in ("be", "fe+be"):
             # Only init venv for Python-based stacks
             if self.init_venv:
                 venv_dir = self.output_dir / "backend" if self.stack == "fe+be" else self.output_dir
@@ -239,17 +254,20 @@ class Scaffolder:
 
         # ── next steps ──────────────────────────────────────────
         typer.echo(f"\n  Next steps:")
-        if self.stack == "fe":
+        if self.stack == "":
+            typer.echo(f"    Start building your project!")
+        elif self.stack == "fe":
             typer.echo(f"    npm install && npm run dev")
         elif self.stack == "fe+be":
             typer.echo(f"    # Backend:")
             typer.echo(f"    cd backend && source .venv/bin/activate")
             typer.echo(f"    # Frontend:")
             typer.echo(f"    cd frontend && npm install && npm run dev")
-        elif self.output_dir == Path.cwd():
-            typer.echo(f"    source .venv/bin/activate")
-        else:
-            cd_dir = self.output_dir.name
-            typer.echo(f"    cd {cd_dir}")
-            typer.echo(f"    source .venv/bin/activate")
+        elif self.stack == "be":
+            if self.output_dir == Path.cwd():
+                typer.echo(f"    source .venv/bin/activate")
+            else:
+                cd_dir = self.output_dir.name
+                typer.echo(f"    cd {cd_dir}")
+                typer.echo(f"    source .venv/bin/activate")
         typer.echo(f"    # Start building!\n")

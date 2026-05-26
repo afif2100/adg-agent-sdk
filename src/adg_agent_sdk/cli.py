@@ -7,7 +7,7 @@ from click import Choice as ClickChoice
 
 from . import __version__
 from .name_utils import normalize_project_name, project_name_to_package
-from .scaffold import STACK_CHOICES, Scaffolder
+from .scaffold import STACK_CHOICES, DEFAULT_STACK, Scaffolder
 
 app = typer.Typer(
     name="adg-sdk",
@@ -46,7 +46,7 @@ def init(
         help="Name of the project (e.g. 'my-analytics-app')",
     ),
     stack: str = typer.Option(
-        "be",
+        DEFAULT_STACK,
         "--stack",
         "-s",
         help="Project stack: be (backend), fe (frontend), or fe+be (fullstack)",
@@ -104,7 +104,7 @@ def init(
     configuration, and optional example code following AI Development
     Group (ADG) standards. Use --stack to choose the project type.
     """
-    if stack not in STACK_CHOICES:
+    if stack and stack not in STACK_CHOICES:
         typer.echo(f"Invalid stack '{stack}'. Choose from: {', '.join(STACK_CHOICES)}", err=True)
         raise typer.Exit(1)
 

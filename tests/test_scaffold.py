@@ -39,7 +39,7 @@ class TestScaffolder:
 
     def test_core_files_created(self) -> None:
         """The core scaffold should create essential project files."""
-        output = self._run_scaffold()
+        output = self._run_scaffold(stack="be")
         files = {f.relative_to(output).as_posix() for f in output.rglob("*") if f.is_file()}
 
         assert "pyproject.toml" in files, f"Missing pyproject.toml. Files: {files}"
@@ -57,7 +57,7 @@ class TestScaffolder:
 
     def test_pyproject_toml_content(self) -> None:
         """pyproject.toml should reference the project name."""
-        output = self._run_scaffold()
+        output = self._run_scaffold(stack="be")
         content = (output / "pyproject.toml").read_text()
         assert "test-project" in content
 
@@ -72,7 +72,7 @@ class TestScaffolder:
 
     def test_example_code_included_by_default(self) -> None:
         """With --example-code (default), agent/tool/workflow dirs should exist."""
-        output = self._run_scaffold()
+        output = self._run_scaffold(stack="be")
         assert (output / "src/test_project/agents/__init__.py").exists()
         assert (output / "src/test_project/tools/__init__.py").exists()
         assert (output / "src/test_project/workflows/__init__.py").exists()
@@ -82,7 +82,7 @@ class TestScaffolder:
 
     def test_no_example_code(self) -> None:
         """Without --example-code, agent/tool/workflow dirs should NOT exist."""
-        output = self._run_scaffold(include_example_code=False)
+        output = self._run_scaffold(stack="be", include_example_code=False)
         assert not (output / "src/test_project/agents/__init__.py").exists()
         assert not (output / "src/test_project/tools/__init__.py").exists()
         assert not (output / "src/test_project/workflows/__init__.py").exists()
@@ -108,7 +108,7 @@ class TestScaffolder:
 
     def test_package_name_substitution_in_code(self) -> None:
         """Python files should reference the correct package name."""
-        output = self._run_scaffold(project_name="custom-app", package_name="custom_app")
+        output = self._run_scaffold(project_name="custom-app", package_name="custom_app", stack="be")
         init_content = (output / "src/custom_app/__init__.py").read_text()
         assert "custom_app" in init_content
 
@@ -119,9 +119,9 @@ class TestScaffolder:
 
     # ── stack tests ────────────────────────────────────────────
 
-    def test_stack_be_default(self) -> None:
-        """Default stack (be) puts everything at project root."""
-        output = self._run_scaffold()
+    def test_stack_be(self) -> None:
+        """Stack be puts everything at project root."""
+        output = self._run_scaffold(stack="be")
         assert (output / "pyproject.toml").exists()
         assert (output / "src").exists()
         assert not (output / "backend").exists()
