@@ -53,10 +53,10 @@ def init(
         show_choices=True,
     ),
     directory: Path = typer.Option(
-        None,
+        Path.cwd(),
         "--dir",
         "-d",
-        help="Output directory (default: <project-name> in current directory)",
+        help="Output directory (default: current directory)",
         file_okay=False,
         dir_okay=True,
     ),
@@ -110,12 +110,11 @@ def init(
 
     normalized = normalize_project_name(project_name)
     package = project_name_to_package(project_name)
-    output_dir = directory or Path.cwd() / normalized
 
     scaffolder = Scaffolder(
         project_name=normalized,
         package_name=package,
-        output_dir=output_dir,
+        output_dir=directory,
         stack=stack,
         include_example_code=example_code,
         include_docker=docker,
@@ -132,10 +131,10 @@ def init(
 @app.command()
 def start(
     directory: Path = typer.Option(
-        None,
+        Path.cwd(),
         "--dir",
         "-d",
-        help="Output directory (default: <project-name> in current directory)",
+        help="Output directory (default: current directory)",
         file_okay=False,
         dir_okay=True,
     ),
@@ -190,12 +189,11 @@ def start(
     # ── Scaffold ───────────────────────────────────────────────
     normalized = normalize_project_name(project_name)
     package = project_name_to_package(project_name)
-    output_dir = directory or Path.cwd() / normalized
 
     scaffolder = Scaffolder(
         project_name=normalized,
         package_name=package,
-        output_dir=output_dir,
+        output_dir=directory,
         stack=stack,
         include_example_code=example_code,
         include_docker=docker,

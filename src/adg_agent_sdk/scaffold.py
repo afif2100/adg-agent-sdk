@@ -164,17 +164,20 @@ class Scaffolder:
             f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         )
 
-        if self.output_dir.exists() and not self.force:
+        # When scaffolding into current directory, skip overwrite/rmtree
+        is_cwd = self.output_dir == Path.cwd()
+        if not is_cwd and self.output_dir.exists() and not self.force:
             if not _confirm_overwrite(self.output_dir):
                 typer.echo("Aborted.")
                 raise typer.Exit(0)
             if not self.dry_run:
                 shutil.rmtree(self.output_dir)
-        elif self.output_dir.exists() and self.force and not self.dry_run:
+        elif not is_cwd and self.output_dir.exists() and self.force and not self.dry_run:
             shutil.rmtree(self.output_dir)
 
         # ── render project templates ────────────────────────────
-        typer.echo(f"  Creating project files in {self.output_dir}")
+        label = "current directory" if is_cwd else str(self.output_dir)
+        typer.echo(f"  Creating project files in {label}")
 
         # Root-level files always at project root
         self._render_tree("minimal/root", self.output_dir)
@@ -221,7 +224,8 @@ class Scaffolder:
             typer.echo("\n  ✓ Dry-run complete.")
             return
 
-        typer.echo(f"\n  ✓ Project scaffolded at: {self.output_dir}")
+        label = "current directory" if self.output_dir == Path.cwd() else str(self.output_dir)
+        typer.echo(f"\n  ✓ Project scaffolded at: {label}")
 
         # ── post-gen hooks ──────────────────────────────────────
         if self.stack != "fe":
@@ -235,15 +239,17 @@ class Scaffolder:
 
         # ── next steps ──────────────────────────────────────────
         typer.echo(f"\n  Next steps:")
-        cd_dir = self.output_dir.name
-        typer.echo(f"    cd {cd_dir}")
         if self.stack == "fe":
-            typer.echo(f"    cd frontend && npm install && npm run dev")
+            typer.echo(f"    npm install && npm run dev")
         elif self.stack == "fe+be":
             typer.echo(f"    # Backend:")
             typer.echo(f"    cd backend && source .venv/bin/activate")
             typer.echo(f"    # Frontend:")
             typer.echo(f"    cd frontend && npm install && npm run dev")
+        elif self.output_dir == Path.cwd():
+            typer.echo(f"    source .venv/bin/activate")
         else:
+            cd_dir = self.output_dir.name
+            typer.echo(f"    cd {cd_dir}")
             typer.echo(f"    source .venv/bin/activate")
         typer.echo(f"    # Start building!\n")
