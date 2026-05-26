@@ -234,6 +234,17 @@ class Scaffolder:
                 gitkeep.write_text("")
                 typer.echo(f"  📄  {gitkeep.relative_to(self.output_dir)}")
 
+        # ── copy skillbook into .claude/skills ──────────────────
+        skillbook_src = TEMPLATES_DIR.parent / "skillbook"
+        skills_dest = self.output_dir / ".claude" / "skills"
+        if skillbook_src.is_dir():
+            for skill_file in sorted(skillbook_src.rglob("*.md")):
+                if self.dry_run:
+                    typer.echo(f"  📄  {skills_dest.relative_to(self.output_dir)}/{skill_file.name}")
+                else:
+                    shutil.copy2(skill_file, skills_dest / skill_file.name)
+                    typer.echo(f"  📄  {skills_dest.relative_to(self.output_dir)}/{skill_file.name}")
+
         # ── summary ─────────────────────────────────────────────
         if self.dry_run:
             typer.echo("\n  ✓ Dry-run complete.")
