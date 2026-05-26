@@ -14,6 +14,8 @@ from . import __version__
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 
+STACK_CHOICES = ("be", "fe", "fe+be")
+
 
 def _confirm_overwrite(path: Path) -> bool:
     """Prompt the user to overwrite an existing directory."""
@@ -44,6 +46,7 @@ class Scaffolder:
         project_name: str,
         package_name: str,
         output_dir: Path,
+        stack: str = "be",
         include_example_code: bool = True,
         include_docker: bool = False,
         include_ci: bool = False,
@@ -55,6 +58,7 @@ class Scaffolder:
         self.project_name = project_name
         self.package_name = package_name
         self.output_dir = output_dir.resolve()
+        self.stack = stack if stack in STACK_CHOICES else "be"
         self.include_example_code = include_example_code
         self.include_docker = include_docker
         self.include_ci = include_ci
@@ -75,14 +79,13 @@ class Scaffolder:
             "python_version": ">=3.11",
             "year": date.today().year,
             "today": date.today().isoformat(),
+            "stack": self.stack,
             "include_example_code": self.include_example_code,
             "include_docker": self.include_docker,
             "include_ci": self.include_ci,
         }
 
     # ── helpers ──────────────────────────────────────────────────────
-
-
 
     def _resolve_dest_path(self, rel_root: Path, fname: str, dest: Path) -> Path:
         """Resolve the destination path, substituting {{{package_name}}} where it appears."""
@@ -97,17 +100,18 @@ class Scaffolder:
         substituted.append(out_name)
         return dest / Path(*substituted)
 
-    def _render_tree(self, template_dir: str, dest: Path) -> None:
+    def _render_tree(self, template_dir: str, dest: Path, prefix: Path | None = None) -> None:
         """Render all Jinja2 templates and copy plain files from a template subtree.
 
         Directory names containing {{{package_name}}} are substituted with the
         actual package name at runtime.
+
+        When *prefix* is set, files are placed under that subdirectory within *dest*.
         """
         src_dir = TEMPLATES_DIR / template_dir
         if not src_dir.is_dir():
             return
 
-        # Build Jinja2 environment that can resolve templates from this subtree
         local_env = Environment(
             loader=FileSystemLoader(str(src_dir)),
             autoescape=False,
@@ -116,7 +120,8 @@ class Scaffolder:
         for root, _dirs, files in os.walk(src_dir):
             rel_root = Path(root).relative_to(src_dir)
             for fname in files:
-                dest_path = self._resolve_dest_path(rel_root, fname, dest)
+                output_root = dest / prefix if prefix else dest
+                dest_path = self._resolve_dest_path(rel_root, fname, output_root)
 
                 if self.dry_run:
                     typer.echo(f"  📄  {dest_path.relative_to(self.output_dir)}")
@@ -126,7 +131,6 @@ class Scaffolder:
                 src_file = Path(root) / fname
 
                 if fname.endswith(".jinja"):
-                    # Resolve the template name relative to src_dir
                     tmpl_rel = (rel_root / fname).as_posix()
                     content = local_env.get_template(tmpl_rel).render(**self._template_context())
                     dest_path.write_text(content, encoding="utf-8")
@@ -147,16 +151,16 @@ class Scaffolder:
         typer.echo("  ── uv venv ──")
         _run(["uv", "venv"], cwd=self.output_dir, dry_run=self.dry_run)
 
-
-
     # ── main entry point ─────────────────────────────────────────────
 
     def run(self) -> None:
         """Execute the full scaffold."""
         # ── preamble ─────────────────────────────────────────────
+        stack_label = {"be": "Backend", "fe": "Frontend", "fe+be": "Fullstack (FE + BE)"}[self.stack]
         typer.echo(
             f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             f"\n ADG SDK › Creating project: {self.project_name}"
+            f"\n           Stack: {stack_label}"
             f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         )
 
@@ -171,11 +175,23 @@ class Scaffolder:
 
         # ── render project templates ────────────────────────────
         typer.echo(f"  Creating project files in {self.output_dir}")
-        self._render_tree("minimal/core", self.output_dir)
 
-        if self.include_example_code:
-            self._render_tree("minimal/example", self.output_dir)
+        # Root-level files always at project root
+        self._render_tree("minimal/root", self.output_dir)
 
+        # Backend stack: be or fe+be
+        if self.stack in ("be", "fe+be"):
+            be_prefix = Path("backend") if self.stack == "fe+be" else None
+            self._render_tree("minimal/core", self.output_dir, prefix=be_prefix)
+            if self.include_example_code:
+                self._render_tree("minimal/example", self.output_dir, prefix=be_prefix)
+
+        # Frontend stack: fe or fe+be
+        if self.stack in ("fe", "fe+be"):
+            fe_prefix = Path("frontend") if self.stack == "fe+be" else None
+            self._render_tree("minimal/frontend", self.output_dir, prefix=fe_prefix)
+
+        # Optional extras (always at project root unless stack is fe+be)
         if self.include_docker:
             self._render_tree("with-docker", self.output_dir)
 
@@ -185,10 +201,11 @@ class Scaffolder:
         # ── write .adg-sdk marker ───────────────────────────────
         marker = {
             "adg_sdk_version": __version__,
-            "template_version": 1,
+            "template_version": 2,
             "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "project_name": self.project_name,
             "package_name": self.package_name,
+            "stack": self.stack,
         }
         if self.dry_run:
             typer.echo(f"  📄  .adg-sdk")
@@ -207,14 +224,26 @@ class Scaffolder:
         typer.echo(f"\n  ✓ Project scaffolded at: {self.output_dir}")
 
         # ── post-gen hooks ──────────────────────────────────────
+        if self.stack != "fe":
+            # Only init venv for Python-based stacks
+            if self.init_venv:
+                venv_dir = self.output_dir / "backend" if self.stack == "fe+be" else self.output_dir
+                _run(["uv", "venv"], cwd=venv_dir, dry_run=self.dry_run)
+
         if self.init_git:
             self._init_git_repo()
-        if self.init_venv:
-            self._create_venv()
 
-        typer.echo(
-            f"\n  Next steps:\n"
-            f"    cd {self.output_dir.name}\n"
-            f"    source .venv/bin/activate\n"
-            f"    # Start building!\n"
-        )
+        # ── next steps ──────────────────────────────────────────
+        typer.echo(f"\n  Next steps:")
+        cd_dir = self.output_dir.name
+        typer.echo(f"    cd {cd_dir}")
+        if self.stack == "fe":
+            typer.echo(f"    cd frontend && npm install && npm run dev")
+        elif self.stack == "fe+be":
+            typer.echo(f"    # Backend:")
+            typer.echo(f"    cd backend && source .venv/bin/activate")
+            typer.echo(f"    # Frontend:")
+            typer.echo(f"    cd frontend && npm install && npm run dev")
+        else:
+            typer.echo(f"    source .venv/bin/activate")
+        typer.echo(f"    # Start building!\n")

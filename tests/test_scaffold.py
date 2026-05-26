@@ -116,6 +116,53 @@ class TestScaffolder:
         assert "custom_app" in workflow
         assert "custom_app.agents.hello_agent" in workflow
 
+    # ── stack tests ────────────────────────────────────────────
+
+    def test_stack_be_default(self) -> None:
+        """Default stack (be) puts everything at project root."""
+        output = self._run_scaffold()
+        assert (output / "pyproject.toml").exists()
+        assert (output / "src").exists()
+        assert not (output / "backend").exists()
+        assert not (output / "frontend").exists()
+
+    def test_stack_fe_only(self) -> None:
+        """Stack fe creates frontend files at project root."""
+        output = self._run_scaffold(stack="fe")
+        assert (output / "package.json").exists()
+        assert (output / "index.html").exists()
+        assert (output / "vite.config.js").exists()
+        # No backend files
+        assert not (output / "pyproject.toml").exists()
+
+    def test_stack_fe_only_without_python(self) -> None:
+        """Stack fe should not create Python venv or example code."""
+        output = self._run_scaffold(stack="fe", include_example_code=False)
+        assert (output / "package.json").exists()
+        assert not (output / "pyproject.toml").exists()
+
+    def test_stack_fe_plus_be(self) -> None:
+        """Stack fe+be creates backend/ and frontend/ subdirectories."""
+        output = self._run_scaffold(stack="fe+be")
+        assert (output / "backend/pyproject.toml").exists()
+        assert (output / "backend/src/test_project/__init__.py").exists()
+        assert (output / "frontend/package.json").exists()
+        assert (output / "frontend/index.html").exists()
+        # Root-level files
+        assert (output / ".gitignore").exists()
+        assert (output / "README.md").exists()
+
+    def test_stack_fe_plus_be_example_code(self) -> None:
+        """Stack fe+be with example code puts examples in backend/."""
+        output = self._run_scaffold(stack="fe+be")
+        assert (output / "backend/src/test_project/agents/hello_agent.py").exists()
+
+    def test_stack_adg_marker_includes_stack(self) -> None:
+        """The .adg-sdk marker should record the stack choice."""
+        output = self._run_scaffold(stack="fe+be")
+        marker = json.loads((output / ".adg-sdk").read_text())
+        assert marker["stack"] == "fe+be"
+
     def test_dry_run_does_not_write(self) -> None:
         """Dry-run should not create any files or directories."""
         tmpdir = Path(tempfile.mkdtemp())
