@@ -48,6 +48,7 @@ class TestScaffolder:
         assert ".env.example" in files
         assert ".adg-sdk" in files
         assert "src/test_project/__init__.py" in files
+        assert "src/test_project/__main__.py" in files
         assert "src/test_project/app.py" in files
         assert "src/test_project/config/__init__.py" in files
         assert "src/test_project/config/settings.py" in files
