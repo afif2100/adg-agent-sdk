@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import typer
+from click import Choice as ClickChoice
 
 from . import __version__
 from .name_utils import normalize_project_name, project_name_to_package
@@ -170,7 +171,7 @@ def start(
 
     stack = typer.prompt(
         "Project stack",
-        type=typer.Choice(list(STACK_CHOICES)),
+        type=ClickChoice(list(STACK_CHOICES)),
         default="be",
         show_choices=True,
     )

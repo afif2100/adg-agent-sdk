@@ -44,7 +44,23 @@ dev = [
 minversion = "8.0"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --cov=adg_agent_sdk --cov-report=term-missing --cov-report=html"
+
+[tool.coverage.run]
+source = ["src/adg_agent_sdk"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == \"__main__\":",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
 
 [tool.ruff]
 target-version = "py311"
