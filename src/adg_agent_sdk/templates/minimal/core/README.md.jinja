@@ -1,0 +1,50 @@
+# {{ project_name }}
+
+> An ADG (AI Development Group) compliant project.
+
+## Getting Started
+
+```bash
+# Activate the virtual environment
+source .venv/bin/activate
+
+# Install dependencies
+uv sync
+
+# Run the app
+python -m {{ package_name }}
+
+# Run tests
+pytest
+```
+
+## Project Structure
+
+```
+{{ project_dir }}/
+├── src/
+│   └── {{ package_name }}/
+│       ├── __init__.py
+│       ├── app.py              # Entry point
+│       ├── agents/             # Agent definitions
+│       ├── tools/              # Custom tool implementations
+│       ├── workflows/          # Workflow orchestration
+│       └── config/             # Pydantic settings
+├── tests/                      # Pytest tests
+├── pyproject.toml
+└── README.md
+```
+
+## ADG Standards
+
+This project follows AI Development Group (ADG) conventions:
+
+- **Python >=3.11** — modern type hints, `match` statements
+- **src/ layout** — clean import paths, no import confusion
+- **Separation of concerns** — agents, tools, and workflows are first-class directories
+- **Pydantic config** — type-safe settings from environment variables
+- **Agent-ready** — structured for AI-assisted development workflows
+
+## License
+
+MIT

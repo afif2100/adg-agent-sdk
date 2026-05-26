@@ -1,0 +1,22 @@
+"""Tests for the hello agent."""
+
+from {{ package_name }}.agents.hello_agent import Agent
+
+
+def test_agent_creation() -> None:
+    """An agent should be created with a name and system prompt."""
+    agent = Agent(name="TestAgent", system_prompt="You are a test.")
+    assert agent.name == "TestAgent"
+    assert agent.system_prompt == "You are a test."
+    assert agent.messages == []
+
+
+def test_agent_run_adds_messages() -> None:
+    """Running an agent should record user and assistant messages."""
+    agent = Agent(name="TestAgent", system_prompt="You are a test.")
+    response = agent.run("Hello")
+    assert response is not None
+    assert len(agent.messages) == 2
+    assert agent.messages[0].role == "user"
+    assert agent.messages[0].content == "Hello"
+    assert agent.messages[1].role == "assistant"

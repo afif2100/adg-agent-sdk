@@ -1,0 +1,23 @@
+"""Example workflow — orchestrates agents and tools."""
+
+from __future__ import annotations
+
+from {{ package_name }}.agents.hello_agent import Agent
+from {{ package_name }}.tools.example_tool import ExampleTool
+
+
+def run() -> None:
+    """Run the example workflow."""
+    tool = ExampleTool()
+    agent = Agent(
+        name="ResearchAgent",
+        system_prompt="You are a helpful research assistant.",
+        tools=[tool],
+    )
+
+    result = agent.run("Tell me about ADG standards.")
+    print(result)
+
+
+if __name__ == "__main__":
+    run()

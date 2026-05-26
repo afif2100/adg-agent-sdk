@@ -1,0 +1,10 @@
+"""Tests for example tools."""
+
+from {{ package_name }}.tools.example_tool import ExampleTool
+
+
+def test_echo_tool() -> None:
+    """Echo tool should return the input prefixed."""
+    tool = ExampleTool()
+    result = tool.run("hello")
+    assert result == "Echo: hello"

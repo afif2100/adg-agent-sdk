@@ -1,0 +1,54 @@
+"""Example agent — a simple research-style agent."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Protocol
+
+
+class Tool(Protocol):
+    """Minimal tool interface."""
+
+    name: str
+    description: str
+
+    def run(self, input: str) -> str: ...
+
+
+@dataclass
+class Message:
+    """A single message in an agent conversation."""
+
+    role: str  # "user" | "assistant" | "system"
+    content: str
+
+
+@dataclass
+class Agent:
+    """A minimal agent definition.
+
+    In production, this would integrate with an LLM provider.
+    """
+
+    name: str
+    system_prompt: str
+    tools: list[Tool] = field(default_factory=list)
+    messages: list[Message] = field(default_factory=list)
+
+    def add_message(self, role: str, content: str) -> None:
+        """Record a message in the conversation history."""
+        self.messages.append(Message(role=role, content=content))
+
+    def run(self, user_input: str) -> str:
+        """Process user input through the agent.
+
+        This is a stub — replace with your LLM call.
+        """
+        self.add_message("user", user_input)
+
+        context = f"[{self.name} would process: {user_input}]"
+        if self.tools:
+            context += f"\nAvailable tools: {[t.name for t in self.tools]}"
+
+        self.add_message("assistant", context)
+        return context

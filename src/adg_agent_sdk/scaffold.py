@@ -1,0 +1,220 @@
+"""Project scaffolding logic — renders templates and creates files."""
+
+import json
+import os
+import shutil
+import subprocess
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+import typer
+from jinja2 import Environment, FileSystemLoader
+
+from . import __version__
+
+TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
+
+
+def _confirm_overwrite(path: Path) -> bool:
+    """Prompt the user to overwrite an existing directory."""
+    answer = typer.prompt(
+        f"Directory '{path}' already exists. Overwrite?",
+        default="n",
+        type=str,
+    )
+    return answer.lower() in ("y", "yes")
+
+
+def _run(cmd: list[str], cwd: Path | None = None, dry_run: bool = False) -> None:
+    """Run a shell command, printing it first."""
+    cwd_str = f" in {cwd}" if cwd else ""
+    typer.echo(f"  ⚙️  {'[dry-run] would run:' if dry_run else 'running:'} {' '.join(cmd)}{cwd_str}")
+    if not dry_run:
+        try:
+            subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            typer.echo(f"  ⚠️  Command failed (continuing): {e.stderr.strip()}", err=True)
+
+
+class Scaffolder:
+    """Orchestrates scaffolding a new ADG-compliant project."""
+
+    def __init__(
+        self,
+        project_name: str,
+        package_name: str,
+        output_dir: Path,
+        include_example_code: bool = True,
+        include_docker: bool = False,
+        include_ci: bool = False,
+        init_git: bool = True,
+        init_venv: bool = True,
+        force: bool = False,
+        dry_run: bool = False,
+    ) -> None:
+        self.project_name = project_name
+        self.package_name = package_name
+        self.output_dir = output_dir.resolve()
+        self.include_example_code = include_example_code
+        self.include_docker = include_docker
+        self.include_ci = include_ci
+        self.init_git = init_git
+        self.init_venv = init_venv
+        self.force = force
+        self.dry_run = dry_run
+
+    # ── context ──────────────────────────────────────────────────────
+
+    def _template_context(self) -> dict:
+        """Return the Jinja2 template variables."""
+        return {
+            "project_name": self.project_name,
+            "package_name": self.package_name,
+            "project_dir": self.output_dir.name,
+            "sdk_version": __version__,
+            "python_version": ">=3.11",
+            "year": date.today().year,
+            "today": date.today().isoformat(),
+            "include_example_code": self.include_example_code,
+            "include_docker": self.include_docker,
+            "include_ci": self.include_ci,
+        }
+
+    # ── helpers ──────────────────────────────────────────────────────
+
+
+
+    def _resolve_dest_path(self, rel_root: Path, fname: str, dest: Path) -> Path:
+        """Resolve the destination path, substituting {{{package_name}}} where it appears."""
+        parts = list(rel_root.parts)
+        substituted = [
+            p.replace("{{package_name}}", self.package_name)
+            for p in parts
+        ]
+        out_name = fname
+        if out_name.endswith(".jinja"):
+            out_name = out_name[: -len(".jinja")]
+        substituted.append(out_name)
+        return dest / Path(*substituted)
+
+    def _render_tree(self, template_dir: str, dest: Path) -> None:
+        """Render all Jinja2 templates and copy plain files from a template subtree.
+
+        Directory names containing {{{package_name}}} are substituted with the
+        actual package name at runtime.
+        """
+        src_dir = TEMPLATES_DIR / template_dir
+        if not src_dir.is_dir():
+            return
+
+        # Build Jinja2 environment that can resolve templates from this subtree
+        local_env = Environment(
+            loader=FileSystemLoader(str(src_dir)),
+            autoescape=False,
+        )
+
+        for root, _dirs, files in os.walk(src_dir):
+            rel_root = Path(root).relative_to(src_dir)
+            for fname in files:
+                dest_path = self._resolve_dest_path(rel_root, fname, dest)
+
+                if self.dry_run:
+                    typer.echo(f"  📄  {dest_path.relative_to(self.output_dir)}")
+                    continue
+
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                src_file = Path(root) / fname
+
+                if fname.endswith(".jinja"):
+                    # Resolve the template name relative to src_dir
+                    tmpl_rel = (rel_root / fname).as_posix()
+                    content = local_env.get_template(tmpl_rel).render(**self._template_context())
+                    dest_path.write_text(content, encoding="utf-8")
+                else:
+                    shutil.copy2(src_file, dest_path)
+                typer.echo(f"  📄  {dest_path.relative_to(self.output_dir)}")
+
+    # ── post-generation hooks ───────────────────────────────────────
+
+    def _init_git_repo(self) -> None:
+        """Initialize a git repository."""
+        typer.echo("  ── git init ──")
+        _run(["git", "init", "-b", "main"], cwd=self.output_dir, dry_run=self.dry_run)
+        _run(["git", "add", "."], cwd=self.output_dir, dry_run=self.dry_run)
+
+    def _create_venv(self) -> None:
+        """Create a virtual environment using uv."""
+        typer.echo("  ── uv venv ──")
+        _run(["uv", "venv"], cwd=self.output_dir, dry_run=self.dry_run)
+
+
+
+    # ── main entry point ─────────────────────────────────────────────
+
+    def run(self) -> None:
+        """Execute the full scaffold."""
+        # ── preamble ─────────────────────────────────────────────
+        typer.echo(
+            f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            f"\n ADG SDK › Creating project: {self.project_name}"
+            f"\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )
+
+        if self.output_dir.exists() and not self.force:
+            if not _confirm_overwrite(self.output_dir):
+                typer.echo("Aborted.")
+                raise typer.Exit(0)
+            if not self.dry_run:
+                shutil.rmtree(self.output_dir)
+        elif self.output_dir.exists() and self.force and not self.dry_run:
+            shutil.rmtree(self.output_dir)
+
+        # ── render project templates ────────────────────────────
+        typer.echo(f"  Creating project files in {self.output_dir}")
+        self._render_tree("minimal/core", self.output_dir)
+
+        if self.include_example_code:
+            self._render_tree("minimal/example", self.output_dir)
+
+        if self.include_docker:
+            self._render_tree("with-docker", self.output_dir)
+
+        if self.include_ci:
+            self._render_tree("with-ci", self.output_dir)
+
+        # ── write .adg-sdk marker ───────────────────────────────
+        marker = {
+            "adg_sdk_version": __version__,
+            "template_version": 1,
+            "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "project_name": self.project_name,
+            "package_name": self.package_name,
+        }
+        if self.dry_run:
+            typer.echo(f"  📄  .adg-sdk")
+        else:
+            (self.output_dir / ".adg-sdk").write_text(
+                json.dumps(marker, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            typer.echo("  📄  .adg-sdk")
+
+        # ── summary ─────────────────────────────────────────────
+        if self.dry_run:
+            typer.echo("\n  ✓ Dry-run complete.")
+            return
+
+        typer.echo(f"\n  ✓ Project scaffolded at: {self.output_dir}")
+
+        # ── post-gen hooks ──────────────────────────────────────
+        if self.init_git:
+            self._init_git_repo()
+        if self.init_venv:
+            self._create_venv()
+
+        typer.echo(
+            f"\n  Next steps:\n"
+            f"    cd {self.output_dir.name}\n"
+            f"    source .venv/bin/activate\n"
+            f"    # Start building!\n"
+        )

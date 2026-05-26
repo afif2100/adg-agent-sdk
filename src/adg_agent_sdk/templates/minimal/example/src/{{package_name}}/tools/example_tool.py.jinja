@@ -1,0 +1,17 @@
+"""Example custom tool."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass
+class ExampleTool:
+    """A simple example tool that echoes input."""
+
+    name: str = "echo"
+    description: str = "Echoes the input back to the caller."
+
+    def run(self, input: str) -> str:
+        """Execute the tool and return the result."""
+        return f"Echo: {input}"

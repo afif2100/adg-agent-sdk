@@ -1,0 +1,8 @@
+"""Tests for workflows."""
+
+from {{ package_name }}.workflows.main_workflow import run
+
+
+def test_workflow_runs() -> None:
+    """The default workflow should execute without error."""
+    run()
